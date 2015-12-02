@@ -99,21 +99,21 @@ html
       li {
         list-style-type: none;
       }
-    
+
   body
     div.page
-      h1.err #{status} Error
-      h2 #{message}
-      if stack
+      h1.err #{error.status} Error
+      h2 #{error.message}
+      if showDetails
         section
-          pre.breakout.small_text 
-            strong #{stack}
-            
-      if help 
+          pre.breakout.small_text
+            strong #{JSON.stringify(error, null, 2)}
+
+      if error.help
         section
           pre.breakout
-            strong #{help}
-  
+            strong #{error.help}
+
       ul
-        li 
+        li
           a(href="http://4front.io/docs/introduction", target="_blank") 4front Documentation
