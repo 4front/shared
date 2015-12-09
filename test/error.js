@@ -2,6 +2,8 @@
 var express = require('express');
 var sinon = require('sinon');
 var supertest = require('supertest');
+var assert = require('assert');
+var shortid = require('shortid');
 var errorMiddleware = require('../lib/middleware/error');
 
 require('simple-errors');
@@ -10,6 +12,7 @@ require('dash-assert');
 describe('error middleware', function() {
   var app;
   var error;
+  var extendedRequest;
 
   beforeEach(function() {
     app = express();
@@ -22,8 +25,11 @@ describe('error middleware', function() {
       }
     };
 
+    extendedRequest = null;
+
     error = new Error('error');
     app.use(function(req, res, next) {
+      req.ext = extendedRequest;
       next(error);
     });
 
@@ -43,6 +49,36 @@ describe('error middleware', function() {
     error = Error.http(400);
     supertest(app).get('/')
       .expect(400)
+      .end(done);
+  });
+
+  it('includes url in error dump', function(done) {
+    error = Error.http(500);
+    supertest(app).get('/some/path')
+      .expect(500)
+      .expect(function(res) {
+        assert.equal(res.body.url, 'http://127.0.0.1/some/path');
+        assert.equal(res.body.method, 'GET');
+      })
+      .end(done);
+  });
+
+  it('includes virtual app and version in error dump', function(done) {
+    var appId = shortid.generate();
+    var versionId = shortid.generate();
+
+    extendedRequest = {
+      virtualApp: {appId: appId},
+      virtualAppVersion: {versionId: versionId}
+    };
+
+    error = Error.http(500);
+    supertest(app).get('/some/path')
+      .expect(500)
+      .expect(function(res) {
+        assert.equal(res.body.appId, appId);
+        assert.equal(res.body.versionId, versionId);
+      })
       .end(done);
   });
 
