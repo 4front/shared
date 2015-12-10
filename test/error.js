@@ -55,10 +55,11 @@ describe('error middleware', function() {
   it('includes url in error dump', function(done) {
     error = Error.http(500);
     supertest(app).get('/some/path')
+      .set('Accept', 'application/json')
       .expect(500)
       .expect(function(res) {
-        assert.equal(res.body.url, 'http://127.0.0.1/some/path');
         assert.equal(res.body.method, 'GET');
+        assert.equal(res.body.url, 'http://127.0.0.1/some/path');
       })
       .end(done);
   });
@@ -74,6 +75,7 @@ describe('error middleware', function() {
 
     error = Error.http(500);
     supertest(app).get('/some/path')
+      .set('Accept', 'application/json')
       .expect(500)
       .expect(function(res) {
         assert.equal(res.body.appId, appId);
