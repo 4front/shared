@@ -57,6 +57,7 @@ describe('error middleware', function() {
     supertest(app).get('/some/path')
       .set('Accept', 'application/json')
       .expect(500)
+      .expect('Content-Type', /application\/json/)
       .expect(function(res) {
         assert.equal(res.body.method, 'GET');
         assert.equal(res.body.url, 'http://127.0.0.1/some/path');
@@ -77,6 +78,7 @@ describe('error middleware', function() {
     supertest(app).get('/some/path')
       .set('Accept', 'application/json')
       .expect(500)
+      .expect('Content-Type', /application\/json/)
       .expect(function(res) {
         assert.equal(res.body.appId, appId);
         assert.equal(res.body.versionId, versionId);
