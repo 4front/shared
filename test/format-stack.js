@@ -1,17 +1,20 @@
 var formatStack = require('../lib/format-stack');
 var assert = require('assert');
 
+var baseDir = '/var/app/current';
+
 describe('formatStack', function() {
   it('strips core lines', function() {
     var originalStack = [
-      'at Object.<anonymous> (/Users/xakg/src/4front/aws-platform/node_modules/4front-logger/index.js:7:27)',
+      'at Object.<anonymous> (/var/app/current/aws-platform/node_modules/4front-logger/index.js:7:27)',
       'at Module._compile (module.js:435:26)',
       'at Object.Module._extensions..js (module.js:442:10)'
     ].join('\n');
 
-    var formatted = formatStack(originalStack).split('\n');
+    var formatted = formatStack(originalStack, baseDir).split('\n');
 
     assert.equal(formatted.length, 1);
+    assert.ok(formatted[0].indexOf('(/aws-platform/node_modules/4front-logger/index.js') !== -1);
   });
 
   it('strips node_modules', function() {
@@ -21,7 +24,7 @@ describe('formatStack', function() {
       '    at next (/var/app/current/node_modules/express/lib/router/route.js:131:13)'
     ].join('\n');
 
-    var formatted = formatStack(originalStack).split('\n');
+    var formatted = formatStack(originalStack, baseDir).split('\n');
 
     assert.equal(formatted.length, 1);
     assert.ok(/debug\.js/.test(formatted[0]));
@@ -35,6 +38,15 @@ describe('formatStack', function() {
     ].join('\n');
 
     var formatted = formatStack(originalStack);
+    assert.equal(0, formatted.length);
+  });
+
+  it('strips dashed lines', function() {
+    var originalStack = [
+      '----------------------------------------'
+    ].join('\n');
+
+    var formatted = formatStack(originalStack, baseDir);
     assert.equal(0, formatted.length);
   });
 });
