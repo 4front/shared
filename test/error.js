@@ -18,14 +18,13 @@ describe('error middleware', function() {
     app = express();
 
     app.settings.logger = {
-      middleware: {
-        error: sinon.spy(function(err, req, res, next) {
-          next();
-        })
-      }
+      error: sinon.spy(function() {})
     };
 
-    extendedRequest = null;
+    extendedRequest = {
+      virtualApp: {appId: shortid.generate()},
+      virtualAppVersion: {versionId: shortid.generate()}
+    };
 
     error = new Error('error');
     app.use(function(req, res, next) {
@@ -40,7 +39,11 @@ describe('error middleware', function() {
     supertest(app).get('/')
       .expect(500)
       .expect(function(res) {
-        app.settings.logger.middleware.error.calledWith(sinon.match({status: 500}));
+        assert.isTrue(app.settings.logger.error.calledWith(sinon.match({
+          status: 500,
+          appId: extendedRequest.virtualApp.appId,
+          versionId: extendedRequest.virtualAppVersion.versionId
+        })));
       })
       .end(done);
   });
@@ -66,22 +69,24 @@ describe('error middleware', function() {
   });
 
   it('includes virtual app and version in error dump', function(done) {
-    var appId = shortid.generate();
-    var versionId = shortid.generate();
-
-    extendedRequest = {
-      virtualApp: {appId: appId},
-      virtualAppVersion: {versionId: versionId}
-    };
-
     error = Error.http(500);
     supertest(app).get('/some/path')
       .set('Accept', 'application/json')
       .expect(500)
       .expect('Content-Type', /application\/json/)
       .expect(function(res) {
-        assert.equal(res.body.appId, appId);
-        assert.equal(res.body.versionId, versionId);
+        assert.equal(res.body.appId, extendedRequest.virtualApp.appId);
+        assert.equal(res.body.versionId, extendedRequest.virtualAppVersion.versionId);
+      })
+      .end(done);
+  });
+
+  it('does not log errors with log === false', function(done) {
+    error = Error.http(400, 'Invalid', {log: false});
+    supertest(app).get('/favicon.ico')
+      .expect(400)
+      .expect(function() {
+        assert.isFalse(app.settings.logger.error.called);
       })
       .end(done);
   });
