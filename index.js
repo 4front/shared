@@ -2,6 +2,7 @@ exports.crypto = require('./lib/crypto');
 exports.configure = require('./lib/configure');
 exports.settingDefaults = require('./lib/setting-defaults');
 exports.logger = require('./lib/logger');
+exports.appRegistry = require('./lib/app-registry');
 
 exports.middleware = {
   debug: require('./lib/middleware/debug'),

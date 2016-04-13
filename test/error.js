@@ -40,7 +40,8 @@ describe('error middleware', function() {
       .expect(500)
       .expect(function(res) {
         assert.isTrue(app.settings.logger.error.calledWith(sinon.match({
-          status: 500,
+          eventType: 'httpResponse',
+          statusCode: 500,
           appId: extendedRequest.virtualApp.appId,
           versionId: extendedRequest.virtualAppVersion.versionId
         })));

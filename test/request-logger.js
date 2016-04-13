@@ -43,7 +43,9 @@ describe('requestLogger middleware', function() {
     supertest(app).get('/foo?key=5')
       .expect(200)
       .expect(function(res) {
-        assert.isTrue(app.settings.logger.info.calledWith('request for /foo', sinon.match({
+        debugger;
+        assert.isTrue(app.settings.logger.info.calledWith(sinon.match({
+          eventType: 'httpResponse',
           statusCode: 200,
           appId: extendedRequest.virtualApp.appId,
           versionId: extendedRequest.virtualAppVersion.versionId,
@@ -75,7 +77,7 @@ describe('requestLogger middleware', function() {
     statusCode = 304;
     supertest(app).get('/')
       .expect(function(res) {
-        assert.isTrue(app.settings.logger.info.calledWith('request for /', sinon.match({
+        assert.isTrue(app.settings.logger.info.calledWith(sinon.match({
           statusCode: 304
         })));
       })
