@@ -92,6 +92,17 @@ describe('error middleware', function() {
       .end(done);
   });
 
+  it('excludes error stack for non 500 errors', function(done) {
+    error = Error.http(404, 'Missing');
+    supertest(app).get('/foo')
+      .expect(404)
+      .expect(function(res) {
+        assert.isUndefined(app.settings.logger.error.getCall(0).args[0].stack);
+        assert.isUndefined(res.body.stack);
+      })
+      .end(done);
+  });
+
   it('serves default favicon', function(done) {
     error = Error.http(404);
     supertest(app).get('/favicon.ico')
