@@ -43,7 +43,6 @@ describe('requestLogger middleware', function() {
     supertest(app).get('/foo?key=5')
       .expect(200)
       .expect(function(res) {
-        debugger;
         assert.isTrue(app.settings.logger.info.calledWith(sinon.match({
           eventType: 'httpResponse',
           statusCode: 200,
