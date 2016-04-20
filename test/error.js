@@ -102,11 +102,4 @@ describe('error middleware', function() {
       })
       .end(done);
   });
-
-  it('serves default favicon', function(done) {
-    error = Error.http(404);
-    supertest(app).get('/favicon.ico')
-      .expect(200)
-      .end(done);
-  });
 });
