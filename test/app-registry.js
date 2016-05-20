@@ -22,17 +22,6 @@ describe('appRegistry', function() {
       cacheEnabled: true,
       sslEnabled: true,
       virtualHost: 'apphost.com',
-      cache: {
-        get: sinon.spy(function(key, callback) {
-          callback(null, self.cache[key]);
-        }),
-        del: sinon.spy(function(key) {
-          delete self.cache[key];
-        }),
-        setex: sinon.spy(function(key, value) {
-          self.cache[key] = value;
-        })
-      },
       database: {
         getApplication: sinon.spy(function(appId, callback) {
           callback(null, _.find(self.database.apps, {appId: appId}));
@@ -46,29 +35,15 @@ describe('appRegistry', function() {
       }
     };
 
-    this.registry = appRegistry(this.settings);
-
-    this.addToCache = function(app) {
-      self.settings.cache.setex('app_' + app.appId, JSON.stringify(app));
-      self.settings.cache.setex('app_name_' + app.name, app.appId);
+    this.addAppToDatabase = function(app) {
+      this.database.apps.push(app);
     };
+
+    this.registry = appRegistry(this.settings);
   });
 
   describe('getById', function() {
-    it('app is in cache', function(done) {
-      var appId = '123';
-      this.addToCache({appId: appId, name: 'appname'});
-
-      this.registry.getById(appId, function(err, app) {
-        if (err) return done(err);
-
-        assert.ok(self.settings.cache.get.calledWith('app_' + appId));
-        assert.equal(appId, app.appId);
-        done();
-      });
-    });
-
-    it('app not in cache but in database', function(done) {
+    it('load app from database', function(done) {
       var appId = '123';
       var appName = 'appname';
       this.database.apps.push({appId: appId, name: appName});
@@ -76,19 +51,15 @@ describe('appRegistry', function() {
       this.registry.getById(appId, function(err, app) {
         if (err) return done(err);
 
-        assert.ok(self.settings.cache.get.calledWith('app_' + appId));
         assert.ok(self.settings.database.getApplication.calledWith(appId));
-        assert.ok(self.settings.cache.setex.calledWith('app_' + appId));
-        assert.ok(self.settings.cache.setex.calledWith('app_name_' + appName));
         assert.equal(appId, app.appId);
         done();
       });
     });
 
-    it('app not in cache and not in database', function(done) {
+    it('app not in database', function(done) {
       var appId = '123';
       this.registry.getById(appId, function(err, app) {
-        assert.ok(self.settings.cache.get.calledWith('app_' + appId));
         assert.ok(self.settings.database.getApplication.calledWith(appId));
         assert.ok(_.isNull(app));
         done();
@@ -97,13 +68,10 @@ describe('appRegistry', function() {
 
     it('force reload', function(done) {
       var appId = '123';
-      this.addToCache({appId: appId, name: 'appname'});
       this.database.apps.push({appId: appId, name: 'appname'});
 
       this.registry.getById(appId, {forceReload: true}, function(err, app) {
-        assert.equal(self.settings.cache.get.called, false);
         assert.ok(self.settings.database.getApplication.calledWith(appId));
-        assert.ok(self.settings.cache.setex.calledWith('app_' + appId));
         assert.equal(appId, app.appId);
         done();
       });
@@ -111,46 +79,27 @@ describe('appRegistry', function() {
   });
 
   describe('getByName', function() {
-    it('app in cache', function(done) {
-      var appId = '123';
-      var appName = 'appname';
-      this.addToCache({appId: appId, name: appName});
-
-      this.registry.getByName(appName, function(err, app) {
-        assert.ok(self.settings.cache.get.calledWith('app_name_' + appName));
-        assert.ok(self.settings.cache.get.calledWith('app_' + appId));
-
-        assert.equal(appId, app.appId);
-        done();
-      });
-    });
-
-    it('app not in cache but in database', function(done) {
+    it('app in database', function(done) {
       var appId = '123';
       var appName = 'appname';
       this.database.apps.push({appId: appId, name: appName});
 
       this.registry.getByName(appName, function(err) {
-        assert.ok(self.settings.cache.get.calledWith('app_name_' + appName));
         assert.ok(self.settings.database.getApplicationByName.calledWith(appName));
-        assert.ok(self.settings.cache.setex.calledWith('app_name_' + appName));
-        assert.ok(self.settings.cache.setex.calledWith('app_' + appId));
-
         done();
       });
     });
   });
 
   describe('batchGetById()', function() {
-    it('some in cache, some not', function(done) {
-      this.database.apps.push({appId: '1', name: 'app1'});
-      this.addToCache({appId: '2', name: 'app2'});
+    it('some in database, some not', function(done) {
+      this.database.apps.push({appId: '1', name: 'app1'}, {appId: '2', name: 'app2'});
 
       this.registry.batchGetById(['1', '2', '3'], function(err, apps) {
         assert.equal(apps.length, 2);
         assert.ok(self.settings.database.getApplication.calledWith('1'));
+        assert.ok(self.settings.database.getApplication.calledWith('2'));
         assert.ok(self.settings.database.getApplication.calledWith('3'));
-        assert.ok(self.settings.cache.setex.calledWith('app_1'));
         done();
       });
     });
@@ -160,11 +109,10 @@ describe('appRegistry', function() {
     beforeEach(function() {
       self = this;
       this.appId = shortid.generate();
-      this.settings.database.getAppIdByDomainName = sinon.spy(function(domainName, subDomain, callback) {
-        callback(null, self.appId);
-      });
-
-      this.addToCache({appId: this.appId});
+      this.settings.database.getAppIdByDomainName = sinon.spy(
+        function(domainName, subDomain, callback) {
+          callback(null, self.appId);
+        });
 
       this.settings.database.getLegacyDomain = sinon.spy(function(fullDomainName, callback) {
         callback(null, {domain: fullDomainName, appId: self.appId});
@@ -172,6 +120,8 @@ describe('appRegistry', function() {
     });
 
     it('new style domain exists', function(done) {
+      this.addAppToDatabase({appId: self.appId});
+
       this.registry.getByDomain('app.com', '@', function(err, app) {
         if (err) return done(err);
         assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', '@'));
@@ -182,9 +132,11 @@ describe('appRegistry', function() {
     });
 
     it('new style domain does not exist', function(done) {
-      this.settings.database.getAppIdByDomainName = sinon.spy(function(domainName, subDomain, callback) {
-        callback(null, null);
-      });
+      this.addAppToDatabase({appId: self.appId});
+      this.settings.database.getAppIdByDomainName = sinon.spy(
+        function(domainName, subDomain, callback) {
+          callback(null, null);
+        });
 
       this.registry.getByDomain('app.com', 'www', function(err, app) {
         assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', 'www'));
@@ -195,9 +147,10 @@ describe('appRegistry', function() {
     });
 
     it('no matching new style or legacy domain', function(done) {
-      this.settings.database.getAppIdByDomainName = sinon.spy(function(domainName, subDomain, callback) {
-        callback(null, null);
-      });
+      this.settings.database.getAppIdByDomainName = sinon.spy(
+        function(domainName, subDomain, callback) {
+          callback(null, null);
+        });
 
       this.settings.database.getLegacyDomain = sinon.spy(function(fullDomainName, callback) {
         callback(null, null);
@@ -225,7 +178,7 @@ describe('appRegistry', function() {
 
   describe('fixUpApp', function() {
     it('sets http app url', function(done) {
-      this.addToCache({appId: '1', name: 'app', requireSsl: true});
+      this.database.apps.push({appId: '1', name: 'app', requireSsl: true});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'https://app.apphost.com');
@@ -235,7 +188,7 @@ describe('appRegistry', function() {
 
     it('uses default virtual host if no custom domain with resolve action', function(done) {
       var domain = {domain: 'www.app.com', action: 'redirect'};
-      this.addToCache({appId: '1', name: 'app', domains: [domain]});
+      this.database.apps.push({appId: '1', name: 'app', domains: [domain]});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'https://app.apphost.com');
@@ -245,7 +198,8 @@ describe('appRegistry', function() {
 
     it('sets legacy custom domain app url', function(done) {
       var domain = {domain: 'www.app.com', action: 'resolve'};
-      this.addToCache({
+
+      this.addAppToDatabase({
         appId: '1',
         name: 'app',
         legacyDomains: [domain],
@@ -260,7 +214,7 @@ describe('appRegistry', function() {
 
     it('custom domain when requireSsl is false is http', function(done) {
       var domain = {domain: 'www.app.com', action: 'resolve'};
-      this.addToCache({appId: '1', name: 'app', legacyDomains: [domain], requireSsl: false});
+      this.addAppToDatabase({appId: '1', name: 'app', legacyDomains: [domain], requireSsl: false});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'http://www.app.com');
@@ -274,7 +228,7 @@ describe('appRegistry', function() {
       }));
 
       var appId = '123';
-      this.addToCache({appId: appId});
+      this.addAppToDatabase({appId: appId});
 
       this.registry.getById(appId, function(err, app) {
         assert.isTrue(/^https\:/.test(app.url));
@@ -295,7 +249,7 @@ describe('appRegistry', function() {
     });
 
     it('domainName and subDomain', function(done) {
-      this.addToCache({appId: '1', domainName: 'foo.com', subDomain: 'www'});
+      this.addAppToDatabase({appId: '1', domainName: 'foo.com', subDomain: 'www'});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'https://www.foo.com');
@@ -306,7 +260,7 @@ describe('appRegistry', function() {
     });
 
     it('apex domainName', function(done) {
-      this.addToCache({appId: '1', domainName: 'foo.com', subDomain: '@'});
+      this.addAppToDatabase({appId: '1', domainName: 'foo.com', subDomain: '@'});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'https://foo.com');
@@ -334,10 +288,7 @@ describe('appRegistry', function() {
       this.registry.getById(this.appId, function(err) {
         if (err) return done(err);
 
-        assert.isFalse(self.settings.cache.get.called);
-        assert.isFalse(self.settings.cache.setex.called);
         assert.isTrue(self.settings.database.getApplication.calledWith(self.appId));
-
         done();
       });
     });
@@ -355,10 +306,7 @@ describe('appRegistry', function() {
       this.registry.getByName(this.appName, function(err) {
         if (err) return done(err);
 
-        assert.isFalse(self.settings.cache.get.called);
-        assert.isFalse(self.settings.cache.setex.called);
         assert.isTrue(self.settings.database.getApplicationByName.calledWith(self.appName));
-
         done();
       });
     });
