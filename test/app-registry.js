@@ -271,13 +271,9 @@ describe('appRegistry', function() {
     });
   });
 
-  describe('disable cache', function() {
+  describe('database operations', function() {
     beforeEach(function() {
       self = this;
-
-      this.registry = appRegistry(_.extend({}, this.settings, {
-        cacheEnabled: false
-      }));
 
       this.appId = '123';
       this.appName = 'appname';
