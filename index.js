@@ -10,5 +10,6 @@ exports.middleware = {
   error: require('./lib/middleware/error'),
   requestLogger: require('./lib/middleware/request-logger'),
   healthCheck: require('./lib/middleware/health'),
-  catchAll: require('./lib/middleware/catch-all')
+  catchAll: require('./lib/middleware/catch-all'),
+  cloudFrontSecure: require('./lib/middleware/cloudfront-secure')
 };
