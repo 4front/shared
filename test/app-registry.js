@@ -150,7 +150,7 @@ describe('appRegistry', function() {
       });
     });
 
-    it('no matching new style or legacy domain', function(done) {
+    it('no matching new style domain or legacy domain', function(done) {
       this.settings.database.getAppByDomainName = sinon.spy(
         function(domainName, subDomain, callback) {
           callback(null, null);
@@ -163,6 +163,7 @@ describe('appRegistry', function() {
       this.registry.getByDomain('app.com', 'www', function(err, app) {
         assert.isTrue(self.settings.database.getAppByDomainName.calledWith('app.com', 'www'));
         assert.isTrue(self.settings.database.getLegacyDomain.calledWith('www.app.com'));
+        assert.isFalse(self.settings.database.getApplication.called);
         assert.isNull(app);
         done();
       });
@@ -373,6 +374,7 @@ describe('appRegistry', function() {
 
   describe('fallback database', function() {
     beforeEach(function() {
+      self = this;
       this.appId = shortid.generate();
       this._fallbackDatabase = {
         apps: [],
@@ -389,6 +391,7 @@ describe('appRegistry', function() {
       );
 
       this.settings.databaseFallback = self.databaseFallback = mockDatabase(this._fallbackDatabase);
+      this.settings.databaseFallback.fallback = true;
       this.registry = appRegistry(this.settings);
     });
 
@@ -432,7 +435,7 @@ describe('appRegistry', function() {
         function(dn, sd, callback) { callback(null, null); }
       );
 
-      this.settings.databaseFallback.getLegacyDomain = sinon.spy(
+      this.databaseFallback.getLegacyDomain = sinon.spy(
         function(dn, callback) {
           callback(null, {appId: self.appId, domainName, subDomain});
         });
