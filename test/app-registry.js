@@ -6,37 +6,31 @@ var shortid = require('shortid');
 
 require('dash-assert');
 
-function mockDatabase(storage) {
-  return {
-    getApplication: sinon.spy(function(appId, callback) {
-      callback(null, _.find(storage.apps, {appId: appId}));
-    }),
-    getApplicationByName: sinon.spy(function(name, callback) {
-      callback(null, _.find(storage.apps, {name: name}));
-    }),
-    getLegacyDomain: sinon.spy(function(domain, callback) {
-      callback(null, _.find(storage.domains, {domain: domain}));
-    })
-  };
-}
-
 describe('appRegistry', function() {
   var self;
 
   beforeEach(function() {
     self = this;
 
-    this.cache = {};
     this.database = {
       apps: [],
       domains: []
     };
 
     this.settings = {
-      cacheEnabled: true,
       sslEnabled: true,
       virtualHost: 'apphost.com',
-      database: mockDatabase(this.database)
+      database: {
+        getApplication: sinon.spy(function(appId, callback) {
+          callback(null, _.find(self.database.apps, {appId: appId}));
+        }),
+        getApplicationByName: sinon.spy(function(name, callback) {
+          callback(null, _.find(self.database.apps, {name: name}));
+        }),
+        getLegacyDomain: sinon.spy(function(domain, callback) {
+          callback(null, _.find(self.database.domains, {domain: domain}));
+        })
+      }
     };
 
     this.addAppToDatabase = function(app) {
@@ -65,18 +59,7 @@ describe('appRegistry', function() {
       var appId = '123';
       this.registry.getById(appId, function(err, app) {
         assert.ok(self.settings.database.getApplication.calledWith(appId));
-        assert.ok(_.isNull(app));
-        done();
-      });
-    });
-
-    it('force reload', function(done) {
-      var appId = '123';
-      this.database.apps.push({appId: appId, name: 'appname'});
-
-      this.registry.getById(appId, {forceReload: true}, function(err, app) {
-        assert.ok(self.settings.database.getApplication.calledWith(appId));
-        assert.equal(appId, app.appId);
+        assert.isEmpty(app);
         done();
       });
     });
@@ -168,17 +151,6 @@ describe('appRegistry', function() {
         done();
       });
     });
-  });
-
-  it('add to registry', function() {
-    var app = {
-      appId: '1',
-      name: 'test',
-      requireSsl: true
-    };
-
-    this.registry.add(app);
-    assert.equal(app.url, 'https://test.apphost.com');
   });
 
   describe('fixUpApp', function() {
@@ -369,101 +341,6 @@ describe('appRegistry', function() {
       assert.equal(app.urls.test, 'https://site--test.market.net');
       assert.equal(app.urls.dev, 'https://site--dev.market.net');
       done();
-    });
-  });
-
-  describe('fallback database', function() {
-    beforeEach(function() {
-      self = this;
-      this.appId = shortid.generate();
-      this._fallbackDatabase = {
-        apps: [],
-        domains: []
-      };
-
-      this.settings.database.getAppByDomainName = sinon.spy(
-        function(dn, sd, callback) {
-          callback(null, null);
-        });
-
-      this.settings.database.getLegacyDomain = sinon.spy(
-        function(dn, callback) { callback(null, null); }
-      );
-
-      this.settings.databaseFallback = self.databaseFallback = mockDatabase(this._fallbackDatabase);
-      this.settings.databaseFallback.fallback = true;
-      this.registry = appRegistry(this.settings);
-    });
-
-    it('gets app by name', function(done) {
-      var appName = 'appname';
-      this._fallbackDatabase.apps.push({appId: this.appId, name: appName});
-
-      this.registry.getByName(appName, function(err, app) {
-        assert.isTrue(self.settings.database.getApplicationByName.calledWith(appName));
-        assert.isTrue(self.settings.databaseFallback.getApplicationByName.calledWith(appName));
-        assert.equal(app.name, appName);
-        done();
-      });
-    });
-
-    it('gets app by domain name', function(done) {
-      var domainName = 'domain.com';
-      var subDomain = 'www';
-
-      this.settings.databaseFallback.getAppByDomainName = sinon.spy(
-        function(dn, sd, callback) {
-          callback(null, {appId: self.appId, domainName, subDomain});
-        });
-
-      this.registry.getByDomain(domainName, subDomain, function(err, app) {
-        assert.isTrue(self.settings.database.getAppByDomainName.calledWith(domainName, subDomain));
-        assert.isTrue(self.settings.database.getLegacyDomain.calledWith(
-          subDomain + '.' + domainName));
-        assert.isTrue(self.databaseFallback.getAppByDomainName.calledWith(domainName, subDomain));
-        assert.isMatch(app, {appId: self.appId, domainName, subDomain});
-
-        done();
-      });
-    });
-
-    it('get app by legacy domain', function(done) {
-      var domainName = 'domain.com';
-      var subDomain = 'www';
-
-      this.databaseFallback.getAppByDomainName = sinon.spy(
-        function(dn, sd, callback) { callback(null, null); }
-      );
-
-      this.databaseFallback.getLegacyDomain = sinon.spy(
-        function(dn, callback) {
-          callback(null, {appId: self.appId, domainName, subDomain});
-        });
-
-      this.databaseFallback.getApplication = sinon.spy(function(appId, callback) {
-        callback(null, {appId});
-      });
-
-      this.registry.getByDomain(domainName, subDomain, function(err, app) {
-        if (err) return done(err);
-
-        assert.isTrue(self.settings.database.getAppByDomainName.calledWith(
-          domainName, subDomain));
-        assert.isTrue(self.settings.database.getLegacyDomain.calledWith(
-          subDomain + '.' + domainName));
-        assert.isTrue(self.databaseFallback.getAppByDomainName.calledWith(
-          domainName, subDomain));
-
-        assert.isTrue(self.databaseFallback.getLegacyDomain.calledWith(
-          subDomain + '.' + domainName));
-
-        assert.isTrue(self.databaseFallback.getApplication.calledWith(self.appId));
-
-        assert.ok(app);
-        assert.isMatch(app, {appId: self.appId});
-
-        done();
-      });
     });
   });
 });
